@@ -125,8 +125,12 @@ Of the 2,954 runtime tests one more fails than at v2.60.0:
 rewrote `Array.isArray(c)` in the test file into a call of remeda's own
 `isArray` (F2). Type tests and property tests are unchanged.
 
-typesugar: branch `remeda-case-study-fixes` at `211929e5`, which is `main` at
-`86bcf8c7` plus the fix for F3. Vendored in `vendor/typesugar/`.
+typesugar: branch `remeda-case-study-fixes`, then `main` at `86bcf8c7` plus
+the fix for F3 (`211929e5`). Since the syntax demo the branch is rebased on
+`main` at `ba29e82c` and also carries the fixes for F6-F8 (`8e43be90`, which
+is what `vendor/typesugar/` now holds); with it the Stage 0 results above are
+unchanged (`dist` byte-identical to v2.60.0, the same one runtime failure,
+2,751 type tests passing; rerun 2026-11-14).
 
 What changed in the fork (no file under `packages/remeda/src` or
 `packages/remeda/test` changed):
@@ -216,12 +220,12 @@ native; why is not yet looked into.
 same four computations; `syntax-run.ts` runs both on the same 200 users and
 prints "same results" (`typesugar run syntax-run.ts -p tsconfig.demo.json`).
 
-| Computation   | remeda today                                                                      | with typesugar                                                 | compiles to                             |
-| ------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------- | --------------------------------------- |
-| utility chain | `R.pipe(users, R.filter(isActive), R.sortBy(rule), R.groupBy(g), R.mapValues(f))` | `sortBy(users.filter(isActive), rule).groupBy(g).mapValues(f)` | `mapValues(groupBy(sortBy(...), g), f)` |
-| one utility   | `R.chunk(users, 25)`                                                              | `users.chunk(25)`                                              | `chunk(users, 25)`                      |
-| reduction     | `R.pipe(users, R.filter(p), R.sumBy(f))`                                          | `fused(users.filter(p).map(f).reduce(add, 0))`                 | one `for` loop                          |
-| early exit    | `R.pipe(users, R.filter(p), R.map(f), R.take(10))`                                | `fused(lazy(users).filter(p).map(f).take(10).toArray())`       | one `for` loop with a counter           |
+| Computation   | remeda today                                                                      | with typesugar                                                | compiles to                             |
+| ------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------- | --------------------------------------- |
+| utility chain | `R.pipe(users, R.filter(isActive), R.sortBy(rule), R.groupBy(g), R.mapValues(f))` | `users.filter(isActive).sortBy(rule).groupBy(g).mapValues(f)` | `mapValues(groupBy(sortBy(...), g), f)` |
+| one utility   | `R.chunk(users, 25)`                                                              | `users.chunk(25)`                                             | `chunk(users, 25)`                      |
+| reduction     | `R.pipe(users, R.filter(p), R.sumBy(f))`                                          | `fused(users.filter(p).map(f).reduce(add, 0))`                | one `for` loop                          |
+| early exit    | `R.pipe(users, R.filter(p), R.map(f), R.take(10))`                                | `fused(lazy(users).filter(p).map(f).take(10).toArray())`      | one `for` loop with a counter           |
 
 What it shows:
 
@@ -230,11 +234,16 @@ What it shows:
 - `fused()` fuses native array methods and `lazy()` pipelines, not remeda's
   functions. It replaces remeda's `pipe` for map/filter/take chains instead of
   compiling it; compiling remeda's `pipe` is still Stage 2.
-- Method chains that run through a remeda function with a generic return type
-  are not rewritten and throw at runtime (F6), so `sortBy` has to stay a
-  plain call. Editors and plain `tsc` don't know the methods exist (F5), and
-  `typesugar check` reports the imports they use as unused (F7) or, when a
-  native method has a similar name, the method as missing (F8).
+- With the typesugar used first (`211929e5`), method chains through a remeda
+  function with a generic return type were not rewritten and threw at runtime
+  (F6), and `typesugar check` reported false errors on them (F7, F8). With
+  those fixed (`8e43be90`) the chain above is rewritten, runs with the same
+  results, and `typesugar check` is clean on every demo and probe file.
+- Editors and plain `tsc` still don't know the methods exist (F5).
+- Through a generic remeda function, the chain knows the result's shape (an
+  array, an object) but not its element type, so an extension that needs a
+  specific element type after it (`nums.sortBy(f).sum()`) is a compile
+  error that says to call it as a function or annotate a variable.
 
 ## Findings
 
@@ -294,8 +303,8 @@ x)`. The file needs no typesugar import and no macro: having the plugin in
   to 72 s, the runtime tests from 3.2 s to 57 s; a profile put 54 of 66 s of
   plugin time in `ensureProgram`, mostly file opens, stats and package.json
   parsing. Fix: invalidate only when the code differs from what the Program
-  read, as the ESLint processor already does. Commit `211929e5` on
-  `remeda-case-study-fixes`, failing test first, with a changeset. The dinero.js
+  read, as the ESLint processor already does. Commit `58855dfa` on
+  `remeda-case-study-fixes` (`211929e5` before the rebase), failing test first, with a changeset. The dinero.js
   study fixed the same bug independently the same day (`56f43c89` on
   `dinero-case-study-fixes`, same approach); only one of the two should land. Not fixed:
   each Program rebuild still re-reads every file from disk; worth a look when
@@ -320,7 +329,7 @@ x)`. The file needs no typesugar import and no macro: having the plugin in
   declarations come from tsc too (Turf F5). Stage 0 is unaffected. It matters
   for Stage 3: a type test that calls a remeda function as a method only
   type-checks if the method is declared somewhere tsc can see.
-- **F6 (bug; measured): a method chain through a generic remeda return type is
+- **F6 (bug, fixed; measured): a method chain through a generic remeda return type is
   not rewritten, and `typesugar check` passes it.** `users.sortBy(f).groupBy(g)`
   expands to `sortBy(users, f).groupBy(g)`, which throws `TypeError:
 sortBy(...).groupBy is not a function` at runtime; the same happens after
@@ -333,20 +342,34 @@ sortBy(...).groupBy is not a function` at runtime; the same happens after
   receiver; a variable initialised from an extension call has the checker's
   `any` and is not inferred at all. `typesugar check` reported no error for
   any of these calls. Evidence: `case-study/experiments/syntax-chain-probe.ts`,
-  `syntax-chain-probe2.ts`. Not fixed.
-- **F7 (bug; measured): `typesugar check` reports imports used only through
+  `syntax-chain-probe2.ts`. Fixed in `ba503b37` on `remeda-case-study-fixes`
+  (failing tests first, changeset): the return type of a generic signature is
+  erased to its type parameters' constraints (a mapped type's apparent type,
+  a conditional type's base constraint), only overloads taking the rewritten
+  call's argument count are considered (remeda's purried data-last overloads
+  come first, and `add(addend)` accepts a number receiver too), and a chained
+  call that still can't be rewritten is a compile error instead of a runtime
+  TypeError. Limit: the element type is lost (see the syntax demo). All
+  probe calls are now rewritten.
+- **F7 (bug, fixed; measured): `typesugar check` reports imports used only through
   extension methods as unused.** With remeda's `noUnusedLocals`,
   `import { chunk, groupBy, mapValues } from "remeda"` used only as
   `users.chunk(25)` etc. gives TS6133 (TS6192 when all are unused), in
   `check` and `check --strict`. So a project with `noUnusedLocals` cannot use
   extension methods and keep `check` as its CI gate. Evidence:
-  `typesugar check -p case-study/experiments/tsconfig.demo.json`. Not fixed.
-- **F8 (bug; measured): a method whose name is close to a native one is
+  `typesugar check -p case-study/experiments/tsconfig.demo.json`. Fixed in
+  `ba503b37` and `8e43be90`: after the expansion, `check`, `build` and `watch`
+  drop an unused-import diagnostic for a binding the expansion references
+  (a TS6192 with some such bindings becomes TS6133 for the others). The
+  editor (language service) path was not checked.
+- **F8 (bug, fixed; measured): a method whose name is close to a native one is
   reported as missing.** `users.filter(p).sortBy([f, "desc"])` is rewritten,
   but `typesugar check` reports TS2551 "Property 'sortBy' does not exist ...
   Did you mean 'sort'?", plus TS7006 on the callback parameter: it appears to
   suppress TS2339 for extension calls but not TS2551, which tsc uses when a
   similar name exists. Consistent with that: `users.sortBy(f)` on a
   `ReadonlyArray` (no `sort` member) passes, the same call on `User[]` fails.
-  The suppression code itself is not yet read. Evidence:
-  `case-study/experiments/syntax-similar-name-probe.ts`. Not fixed.
+  Evidence: `case-study/experiments/syntax-similar-name-probe.ts`. Cause
+  confirmed: the ExtensionMethodCall suppression rule handled TS2339 only,
+  and its TS7006 case only a callback passed directly as an argument, not one
+  inside remeda's tuple rule `[(u) => u.score, "desc"]`. Fixed in `ba503b37`.

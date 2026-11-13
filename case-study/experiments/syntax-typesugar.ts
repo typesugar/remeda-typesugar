@@ -10,13 +10,10 @@ interface User {
 }
 
 export function demo(users: ReadonlyArray<User>) {
-  // 1. Extension methods: remeda functions called as methods. sortBy is a
-  //    plain call because a method call after `.sortBy(...)` is not rewritten
-  //    and throws at runtime (F6); see syntax-chain-probe*.ts.
-  const topByGroup = sortBy(
-    users.filter((u) => u.active),
-    [(u) => u.score, "desc"],
-  )
+  // 1. Extension methods: remeda functions called as methods.
+  const topByGroup = users
+    .filter((u) => u.active)
+    .sortBy([(u) => u.score, "desc"])
     .groupBy((u) => u.group)
     .mapValues((us) => us.slice(0, 3));
 
