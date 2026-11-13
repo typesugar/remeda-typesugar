@@ -210,6 +210,32 @@ emit. Where it can't, `pipe(filter, map)` was 4.7 times slower than native
 `filter().map()`, although remeda's data-first `map` alone is faster than
 native; why is not yet looked into.
 
+### Syntax demo (before Stage 1)
+
+`case-study/experiments/syntax-remeda.ts` and `syntax-typesugar.ts` do the
+same four computations; `syntax-run.ts` runs both on the same 200 users and
+prints "same results" (`typesugar run syntax-run.ts -p tsconfig.demo.json`).
+
+| Computation   | remeda today                                                                      | with typesugar                                                 | compiles to                             |
+| ------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------- | --------------------------------------- |
+| utility chain | `R.pipe(users, R.filter(isActive), R.sortBy(rule), R.groupBy(g), R.mapValues(f))` | `sortBy(users.filter(isActive), rule).groupBy(g).mapValues(f)` | `mapValues(groupBy(sortBy(...), g), f)` |
+| one utility   | `R.chunk(users, 25)`                                                              | `users.chunk(25)`                                              | `chunk(users, 25)`                      |
+| reduction     | `R.pipe(users, R.filter(p), R.sumBy(f))`                                          | `fused(users.filter(p).map(f).reduce(add, 0))`                 | one `for` loop                          |
+| early exit    | `R.pipe(users, R.filter(p), R.map(f), R.take(10))`                                | `fused(lazy(users).filter(p).map(f).take(10).toArray())`       | one `for` loop with a counter           |
+
+What it shows:
+
+- Extension methods turn remeda's data-first calls into method calls with no
+  runtime cost; the output is the nested data-first call.
+- `fused()` fuses native array methods and `lazy()` pipelines, not remeda's
+  functions. It replaces remeda's `pipe` for map/filter/take chains instead of
+  compiling it; compiling remeda's `pipe` is still Stage 2.
+- Method chains that run through a remeda function with a generic return type
+  are not rewritten and throw at runtime (F6), so `sortBy` has to stay a
+  plain call. Editors and plain `tsc` don't know the methods exist (F5), and
+  `typesugar check` reports the imports they use as unused (F7) or, when a
+  native method has a similar name, the method as missing (F8).
+
 ## Findings
 
 _typesugar bugs, gaps and design lessons, each with its status and evidence.
@@ -294,3 +320,33 @@ x)`. The file needs no typesugar import and no macro: having the plugin in
   declarations come from tsc too (Turf F5). Stage 0 is unaffected. It matters
   for Stage 3: a type test that calls a remeda function as a method only
   type-checks if the method is declared somewhere tsc can see.
+- **F6 (bug; measured): a method chain through a generic remeda return type is
+  not rewritten, and `typesugar check` passes it.** `users.sortBy(f).groupBy(g)`
+  expands to `sortBy(users, f).groupBy(g)`, which throws `TypeError:
+sortBy(...).groupBy is not a function` at runtime; the same happens after
+  `.chunk(n)` and through a variable (`const s = users.sortBy(f); s.groupBy(g)`).
+  `users.groupBy(g).mapValues(f)` and `sortBy(users, f).groupBy(g)` are
+  rewritten correctly. Cause, from the code: `inferExtensionCallType` in
+  `transformer-core/src/rewriting.ts` takes the return type of an
+  uninstantiated generic signature, and remeda's `ReorderedArray<T>` and
+  `Chunk<T, N>` are conditional types over `T` that then match no array
+  receiver; a variable initialised from an extension call has the checker's
+  `any` and is not inferred at all. `typesugar check` reported no error for
+  any of these calls. Evidence: `case-study/experiments/syntax-chain-probe.ts`,
+  `syntax-chain-probe2.ts`. Not fixed.
+- **F7 (bug; measured): `typesugar check` reports imports used only through
+  extension methods as unused.** With remeda's `noUnusedLocals`,
+  `import { chunk, groupBy, mapValues } from "remeda"` used only as
+  `users.chunk(25)` etc. gives TS6133 (TS6192 when all are unused), in
+  `check` and `check --strict`. So a project with `noUnusedLocals` cannot use
+  extension methods and keep `check` as its CI gate. Evidence:
+  `typesugar check -p case-study/experiments/tsconfig.demo.json`. Not fixed.
+- **F8 (bug; measured): a method whose name is close to a native one is
+  reported as missing.** `users.filter(p).sortBy([f, "desc"])` is rewritten,
+  but `typesugar check` reports TS2551 "Property 'sortBy' does not exist ...
+  Did you mean 'sort'?", plus TS7006 on the callback parameter: it appears to
+  suppress TS2339 for extension calls but not TS2551, which tsc uses when a
+  similar name exists. Consistent with that: `users.sortBy(f)` on a
+  `ReadonlyArray` (no `sort` member) passes, the same call on `User[]` fails.
+  The suppression code itself is not yet read. Evidence:
+  `case-study/experiments/syntax-similar-name-probe.ts`. Not fixed.
