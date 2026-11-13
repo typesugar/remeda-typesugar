@@ -1,6 +1,7 @@
 /* eslint-disable no-console -- Allows tracing the build process. */
 
 import { glob, readFile, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import path from "node:path";
 import {
   build,
@@ -10,6 +11,32 @@ import {
 } from "tsdown";
 
 const SOURCE_DIR = "src";
+
+// typesugar (case study). unplugin-typesugar is a dependency of the separate
+// case-study package (installed with `npm install --prefix case-study`), not
+// of this workspace, so resolve it from there. The package has no
+// `./rolldown` subpath export (case-study finding F1); its `unplugin` object
+// has a Rolldown factory, which is what tsdown takes in `plugins`. It is used
+// in the runtime (JS) step only.
+const caseStudyRequire = createRequire(
+  new URL("../../case-study/package.json", import.meta.url),
+);
+// Typed here because the package's own types aren't resolvable from this
+// workspace.
+type TypesugarUnplugin = {
+  readonly rolldown: (options: {
+    readonly tsconfig: string;
+    readonly verbose: boolean;
+  }) => NonNullable<UserConfig["plugins"]>;
+};
+const { unplugin: typesugarUnplugin } = caseStudyRequire(
+  "unplugin-typesugar",
+) as { readonly unplugin: TypesugarUnplugin };
+const typesugar = (): NonNullable<UserConfig["plugins"]> =>
+  typesugarUnplugin.rolldown({
+    tsconfig: "./tsconfig.source.json",
+    verbose: process.env["TYPESUGAR_VERBOSE"] === "1",
+  });
 
 const SHARED = {
   // TODO [>2]: Remove CJS support?
@@ -60,6 +87,11 @@ export default defineConfig({
   // We use the barrel file so that the result is a single monolithic file.
   entry: `${SOURCE_DIR}/index.ts`,
 
+  // typesugar (case study): not in this step. It emits only declarations,
+  // which rolldown-plugin-dts builds with tsc from the files on disk, and its
+  // ESM and CJS builds share one plugin instance while handing it different
+  // code for the same file (finding F4).
+
   dts: {
     // Only emit DTS files, skip JS output
     emitDtsOnly: true,
@@ -94,6 +126,9 @@ export default defineConfig({
       // This is the second step which relies on the previous step generating
       // the typing artifacts, and only fills in the gaps with the runtime artifacts.
       clean: false,
+
+      // typesugar macro expansion (case study).
+      plugins: typesugar(),
 
       entry: [
         // We use a glob on purpose so that our build creates individual files

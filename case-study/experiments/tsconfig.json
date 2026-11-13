@@ -1,0 +1,9 @@
+{
+  // For case-study experiments: remeda's own compiler options, with "remeda"
+  // resolving to its source, as in remeda's tests.
+  "extends": "../../packages/remeda/tsconfig.json",
+  "include": ["*.ts"],
+  "compilerOptions": {
+    "paths": { "remeda": ["../../packages/remeda/src/index.ts"] }
+  }
+}
