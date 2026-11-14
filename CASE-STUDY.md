@@ -132,8 +132,8 @@ the fix for F3 (`211929e5`). Since the syntax demo the branch is rebased on
 is what `vendor/typesugar/` now holds); with it the Stage 0 results above are
 unchanged (`dist` byte-identical to v2.60.0, the same one runtime failure,
 2,751 type tests passing; rerun 2026-11-14). The branch is now rebased on
-`main` at `325b018f` with the F3 copy dropped (main has it) and carries the
-fixes for F6-F9 (`d5277209`, which `vendor/typesugar/` holds; typesugar PR
+`main` at `10bb2b79` with the F3 copy dropped (main has it) and carries the
+fixes for F6-F9 (`810c4d85`, which `vendor/typesugar/` holds; typesugar PR
 #106). With it the runtime tests pass as at v2.60.0 (rerun 2026-11-14, with
 the module cache off, F12).
 
@@ -396,7 +396,7 @@ sortBy(...).groupBy is not a function` at runtime; the same happens after
   An import that can't take the call is not a candidate, so the native
   method is called. The guide's "Resolution Order" says a native method
   always wins, which contradicts the rule and the code. Supersedes the
-  options in F2. Fixed in typesugar `d5277209` (PR #106): an import must take
+  options in F2. Fixed in typesugar `810c4d85` (PR #106): an import must take
   the rewritten call's argument count (the receiver plus the call's
   arguments; any count with a spread) to be a candidate, in the rewrite, the
   `typesugar check` suppression rule and the unused-import check alike, and
