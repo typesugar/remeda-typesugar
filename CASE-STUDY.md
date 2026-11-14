@@ -169,7 +169,7 @@ Stage 0 run, before F9, and were not remeasured):
 | Runtime tests (`--project runtime`)                                                                       | 2,944 pass, 9 expected fail, 1 todo; 3.2 s | 2,944 pass, 9 expected fail, 1 todo; 3.3 s (with F9) |
 | Type tests (`--project types`)                                                                            | 2,751 pass, no type errors; 1.1 s          | same; 7.1 s                                          |
 | Property tests (`--project prop`)                                                                         | 30 pass; 0.5 s                             | 30 pass; 1.9 s                                       |
-| Files typesugar changes (386 `.ts` files under `src/`, `src/internal/`, `test/`, excluding `*.test-d.ts`) |                                            | 2, both test files, both by design (F9)              |
+| Files typesugar changes (386 `.ts` files under `src/`, `src/internal/`, `test/`, excluding `*.test-d.ts`) |                                            | none (F13)                                           |
 
 - Before the F3 fix, with the plugin in both build steps, the build took 72 s
   (median of 3: 71.6, 73.6, 85.0 s) and the runtime tests 57 s. The F3 fix
@@ -402,9 +402,7 @@ sortBy(...).groupBy is not a function` at runtime; the same happens after
   `typesugar check` suppression rule and the unused-import check alike, and
   the guide's resolution order now states the rule. With it typesugar
   changes only `dropFirstBy.test.ts` and `sortBy.test.ts` (both by design)
-  and the `isArray` test passes. Open: typesugar PR #102 (neverthrow F12)
-  makes a callable native method win over every import, the opposite rule;
-  Dean to decide which one holds.
+  and the `isArray` test passes. The rule part is overtaken by F13.
 - **F10 (bug fix and correction to F4; measured): the plugin keeps one
   Program per build, and the Program rebuilds were mostly something else.**
   Fix: typesugar `5566a2a1` on branch `unplugin-shared-instance-builds`. A
@@ -455,3 +453,22 @@ false }` in `vitest.config.ts`. Fix in typesugar: unplugin-typesugar's
   Vite plugin can register a cache-key generator under Vitest
   (`configureVitest` → `defineCacheKeyGenerator`) that returns `false` for
   the files it transforms, keeping them out of the cache; not done.
+
+- **F13 (design decision, open for Dean; measured): typesugar main now lets
+  a receiver's own method win over every import, the opposite of F9's
+  rule.** typesugar PR #102 (neverthrow case study F12) merged on
+  2026-11-14 at 12:56 UTC: a callable own member wins over every import, so
+  with `import { match }` in scope neverthrow's `result.match(...)` stays its
+  method. F9 recorded Dean's rule that imports decide which name wins. PR
+  #106 was rebased onto #102 and keeps main's behaviour: the F9 fix is now
+  the argument-count check alone, which matters for methods the receiver
+  lacks (it picks `R.take(xs, 2)` over a one-parameter `take` import instead
+  of reporting an ambiguity), and its guide text no longer says an import
+  replaces a native method. Effect here, with `810c4d85` vendored:
+  typesugar changes none of the 386 files (F2's `data.filter(f)` and
+  `.map(...)` rewrites in `dropFirstBy.test.ts` and `sortBy.test.ts` stay
+  native), `dist` is byte-identical to v2.60.0, all three test projects
+  pass as at v2.60.0, and the syntax demo still prints "same results" with
+  `typesugar check` clean. F2's table
+  (`case-study/experiments/stage-0-native-shadowing.ts`) no longer
+  reproduces. Which rule holds is Dean's decision.
