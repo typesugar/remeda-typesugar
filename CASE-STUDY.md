@@ -251,7 +251,7 @@ _typesugar bugs, gaps and design lessons, each with its status and evidence.
 Strength: measured (tested against data) | unverified (plausible, not
 checked)._
 
-- **F1 (gap, open; measured): unplugin-typesugar has no `./rolldown` entry
+- **F1 (gap, being merged by the dinero.js study, see F11; measured): unplugin-typesugar has no `./rolldown` entry
   point.** It exports `./vite`, `./webpack`, `./esbuild`, `./rollup` and
   `./tsup`; tsdown, which remeda (and dinero.js and valibot) build with, takes
   Rolldown plugins. The package's root export, `unplugin`, does have a
@@ -261,7 +261,7 @@ checked)._
   typesugar branch `dinero-case-study-fixes` (`02479fc3`, `56e16666`; not
   pushed as of 2026-11-13). Stage 0 keeps the `unplugin.rolldown` form until
   that lands.
-- **F2 (design issue, open, needs a decision; measured): importing a function
+- **F2 (design issue, decided 2026-11-14 in F9; measured): importing a function
   named like a native method replaces the native call.** In a file that imports
   remeda's `sort`, typesugar rewrites `xs.sort(cmp)` into `sort(xs, cmp)`;
   likewise `reverse`, `map`, `join` and `Array.isArray(x)` → `isArray(Array,
@@ -309,7 +309,7 @@ x)`. The file needs no typesugar import and no macro: having the plugin in
   `dinero-case-study-fixes`, same approach); only one of the two should land. Not fixed:
   each Program rebuild still re-reads every file from disk; worth a look when
   a rebuild is needed (watch mode).
-- **F4 (bug, open; measured): one plugin instance serving builds that see
+- **F4 (bug, fixed 2026-11-14, see F10; measured): one plugin instance serving builds that see
   different code for the same file thrashes.** tsdown runs its ESM and CJS
   builds through the same plugin instance. In remeda's declarations step
   (`emitDtsOnly`), one of them hands the plugin each source file's real text
@@ -373,3 +373,52 @@ sortBy(...).groupBy is not a function` at runtime; the same happens after
   confirmed: the ExtensionMethodCall suppression rule handled TS2339 only,
   and its TS7006 case only a callback passed directly as an argument, not one
   inside remeda's tuple rule `[(u) => u.score, "desc"]`. Fixed in `ba503b37`.
+- **F9 (design decision and bug, open; measured): F2 is decided: imports
+  decide which name wins, so only the `Array.isArray` rewrite is wrong.**
+  Dean's rule (2026-11-14): imports decide symbol scope and which one wins,
+  with no hidden exceptions. Under it, a function imported under the local
+  name `sort` replaces `xs.sort(...)` in that file by design. Of the three
+  remeda files typesugar changes (`case-study/scripts/expand.mjs` over all
+  386 files), two follow the rule and their tests pass:
+  `dropFirstBy.test.ts` (`data.filter(f)` → `filter(data, f)`) and
+  `sortBy.test.ts` (`.map(prop(...))` → `map(..., prop(...))`). The third,
+  `isArray.test.ts`, breaks it: `Array.isArray(c)` → `isArray(Array, c)`
+  calls remeda's one-parameter `isArray` with two arguments. The cause is
+  that `checkImportedSymbolForExtension` (`@typesugar/macros`
+  `extension-imports.ts`) checks only that the first parameter accepts the
+  receiver, not that the import accepts the rewritten call's argument count.
+  An import that can't take the call is not a candidate, so the native
+  method is called. The guide's "Resolution Order" says a native method
+  always wins, which contradicts the rule and the code. Supersedes the
+  options in F2; the fix is not made yet.
+- **F10 (bug fix and correction to F4; measured): the plugin keeps one
+  Program per build, and the Program rebuilds were mostly something else.**
+  Fix: typesugar `5566a2a1` on branch `unplugin-shared-instance-builds`. A
+  file whose text differs from what a Program already transformed goes to a
+  second Program, where it is new, so switching between builds never
+  rebuilds, and each build's files are expanded against that build's own
+  code. Failing tests first, with a changeset and a docs note that a
+  declarations-only step should leave typesugar out. Measured on remeda's
+  declarations step with the plugin added
+  (`case-study/experiments/f4-declarations-step.config.ts`):
+  - on typesugar main, 634 Program builds;
+  - with the dinero.js study's `.d.ts` skip, 212, with or without this fix;
+  - declarations are identical in all three runs.
+
+  tsdown sends one build's files, then the other's, so each file switches
+  once. Most of F4's rebuilds were the plugin-dts virtual `.d.ts` files, not
+  switching. What remains is one rebuild the first time the stub build sends
+  each file, about 80 ms each in remeda. That is the ordinary cost of a
+  changed file. Run times were not comparable: the machine's load average
+  was 38-67 during the runs. The F4 workaround (no plugin in the
+  declarations step) stays: that step's JavaScript is discarded.
+
+- **F11 (process, 2026-11-14): F1 and F3 have one owner.** On Dean's
+  instruction, the dinero.js study merges the shared unplugin fixes.
+  - F3: typesugar main already has the same fix (`932d6e55`, from the
+    neverthrow study, PR #87), so this study's `58855dfa` is dropped from
+    `remeda-case-study-fixes`.
+  - F1: the rolldown entry point, the `.d.ts` skip and the node10 types are
+    on the dinero.js study's local branch `unplugin-rolldown-dts-node10`,
+    based on main `325b018f`.
+  - The F4 fix (F10) is stacked on that branch.
