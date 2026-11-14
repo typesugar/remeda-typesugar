@@ -116,21 +116,26 @@ records why.
 
 ### Stage 0: integration, no source changes
 
-**Result: `dist/` is byte-identical; one runtime test fails because of a
-typesugar design issue (F2).** With typesugar in the build, all 364 files in
-`packages/remeda/dist` (181 ESM `.js`, 181 `.cjs`, `index.d.ts`, `index.d.cts`)
-are byte-identical to v2.60.0, in repeated builds, and attw and publint pass.
-Of the 2,954 runtime tests one more fails than at v2.60.0:
-`src/isArray.test.ts` "should work as type guard in filter", because typesugar
-rewrote `Array.isArray(c)` in the test file into a call of remeda's own
-`isArray` (F2). Type tests and property tests are unchanged.
+**Result: `dist/` is byte-identical and every test passes as at v2.60.0.**
+With typesugar in the build, all 364 files in `packages/remeda/dist` (181 ESM
+`.js`, 181 `.cjs`, `index.d.ts`, `index.d.cts`) are byte-identical to v2.60.0,
+in repeated builds, and attw and publint pass. The runtime, type and property
+tests give the same results as at v2.60.0. Until the F9 fix,
+`src/isArray.test.ts` "should work as type guard in filter" failed, because
+typesugar rewrote `Array.isArray(c)` in the test file into a call of remeda's
+own one-parameter `isArray` (F2, F9). Vitest's on-disk module cache is turned
+off in `vitest.config.ts` (F12).
 
 typesugar: branch `remeda-case-study-fixes`, then `main` at `86bcf8c7` plus
 the fix for F3 (`211929e5`). Since the syntax demo the branch is rebased on
 `main` at `ba29e82c` and also carries the fixes for F6-F8 (`8e43be90`, which
 is what `vendor/typesugar/` now holds); with it the Stage 0 results above are
 unchanged (`dist` byte-identical to v2.60.0, the same one runtime failure,
-2,751 type tests passing; rerun 2026-11-14).
+2,751 type tests passing; rerun 2026-11-14). The branch is now rebased on
+`main` at `325b018f` with the F3 copy dropped (main has it) and carries the
+fixes for F6-F9 (`d5277209`, which `vendor/typesugar/` holds; typesugar PR
+#106). With it the runtime tests pass as at v2.60.0 (rerun 2026-11-14, with
+the module cache off, F12).
 
 What changed in the fork (no file under `packages/remeda/src` or
 `packages/remeda/test` changed):
@@ -143,7 +148,7 @@ What changed in the fork (no file under `packages/remeda/src` or
 - `packages/remeda/vitest.config.ts`: the Vite plugin, ahead of
   `vite-tsconfig-paths`, so test files and the source they import are
   expanded before vitest runs them. `TYPESUGAR_VERBOSE=1` turns on its log in
-  both configs.
+  both configs. Vitest's on-disk module cache (`fsModuleCache`) is off (F12).
 - `case-study/`: the separate package holding the typesugar dependencies (own
   lockfile; remeda's root `package-lock.json` is unchanged), the bench
   (`bench.mjs`, `bench/pipe-chains.mjs`), `scripts/expand.mjs` and
@@ -154,16 +159,17 @@ Unlike Turf, nothing here runs TypeScript straight from source under Node:
 vitest runs tests through Vite's plugins, so typesugar's Node loader (Turf F1)
 is not needed.
 
-Numbers (warm runs; `npm run build` median of 3):
+Numbers (warm runs; `npm run build` median of 3; timings are from the first
+Stage 0 run, before F9, and were not remeasured):
 
-|                                                                                                           | v2.60.0                                    | Stage 0                                                     |
-| --------------------------------------------------------------------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------- |
-| `npm run build`                                                                                           | 1.75 s                                     | 3.0 s                                                       |
-| `dist/` (364 files)                                                                                       |                                            | byte-identical                                              |
-| Runtime tests (`--project runtime`)                                                                       | 2,944 pass, 9 expected fail, 1 todo; 3.2 s | 2,943 pass, **1 fail** (F2), 9 expected fail, 1 todo; 3.3 s |
-| Type tests (`--project types`)                                                                            | 2,751 pass, no type errors; 1.1 s          | same; 7.1 s                                                 |
-| Property tests (`--project prop`)                                                                         | 30 pass; 0.5 s                             | 30 pass; 1.9 s                                              |
-| Files typesugar changes (386 `.ts` files under `src/`, `src/internal/`, `test/`, excluding `*.test-d.ts`) |                                            | 3, all test files (F2)                                      |
+|                                                                                                           | v2.60.0                                    | Stage 0                                              |
+| --------------------------------------------------------------------------------------------------------- | ------------------------------------------ | ---------------------------------------------------- |
+| `npm run build`                                                                                           | 1.75 s                                     | 3.0 s                                                |
+| `dist/` (364 files)                                                                                       |                                            | byte-identical                                       |
+| Runtime tests (`--project runtime`)                                                                       | 2,944 pass, 9 expected fail, 1 todo; 3.2 s | 2,944 pass, 9 expected fail, 1 todo; 3.3 s (with F9) |
+| Type tests (`--project types`)                                                                            | 2,751 pass, no type errors; 1.1 s          | same; 7.1 s                                          |
+| Property tests (`--project prop`)                                                                         | 30 pass; 0.5 s                             | 30 pass; 1.9 s                                       |
+| Files typesugar changes (386 `.ts` files under `src/`, `src/internal/`, `test/`, excluding `*.test-d.ts`) |                                            | 2, both test files, both by design (F9)              |
 
 - Before the F3 fix, with the plugin in both build steps, the build took 72 s
   (median of 3: 71.6, 73.6, 85.0 s) and the runtime tests 57 s. The F3 fix
@@ -373,7 +379,7 @@ sortBy(...).groupBy is not a function` at runtime; the same happens after
   confirmed: the ExtensionMethodCall suppression rule handled TS2339 only,
   and its TS7006 case only a callback passed directly as an argument, not one
   inside remeda's tuple rule `[(u) => u.score, "desc"]`. Fixed in `ba503b37`.
-- **F9 (design decision and bug, open; measured): F2 is decided: imports
+- **F9 (design decision and bug, fixed 2026-11-14; measured): F2 is decided: imports
   decide which name wins, so only the `Array.isArray` rewrite is wrong.**
   Dean's rule (2026-11-14): imports decide symbol scope and which one wins,
   with no hidden exceptions. Under it, a function imported under the local
@@ -390,7 +396,15 @@ sortBy(...).groupBy is not a function` at runtime; the same happens after
   An import that can't take the call is not a candidate, so the native
   method is called. The guide's "Resolution Order" says a native method
   always wins, which contradicts the rule and the code. Supersedes the
-  options in F2; the fix is not made yet.
+  options in F2. Fixed in typesugar `d5277209` (PR #106): an import must take
+  the rewritten call's argument count (the receiver plus the call's
+  arguments; any count with a spread) to be a candidate, in the rewrite, the
+  `typesugar check` suppression rule and the unused-import check alike, and
+  the guide's resolution order now states the rule. With it typesugar
+  changes only `dropFirstBy.test.ts` and `sortBy.test.ts` (both by design)
+  and the `isArray` test passes. Open: typesugar PR #102 (neverthrow F12)
+  makes a callable native method win over every import, the opposite rule;
+  Dean to decide which one holds.
 - **F10 (bug fix and correction to F4; measured): the plugin keeps one
   Program per build, and the Program rebuilds were mostly something else.**
   Fix: typesugar `5566a2a1` on branch `unplugin-shared-instance-builds`. A
@@ -422,3 +436,22 @@ sortBy(...).groupBy is not a function` at runtime; the same happens after
     on the dinero.js study's local branch `unplugin-rolldown-dts-node10`,
     based on main `325b018f`.
   - The F4 fix (F10) is stacked on that branch.
+  - PRs (2026-11-14): the dinero.js study's branch is typesugar #103; the F4
+    fix is #104, stacked on it; this study's F6-F9 fixes are #106, from main.
+
+- **F12 (bug, open; measured): Vitest 5's on-disk module cache serves stale
+  typesugar expansions.** Vitest 5 caches transformed modules in
+  `node_modules/.vitest-cache` by default (`fsModuleCache`), keyed by the
+  file's content and the config, and clears it only when the root's
+  dependencies are reinstalled. typesugar's output for a file also depends on
+  the files it imports (their types decide what is rewritten) and on the
+  typesugar version, neither of which is in the key. After re-vendoring
+  typesugar with the F9 fix, `isArray.test.ts` still failed: vitest ran the
+  old expansion (`isArray(Array, c)`) from its cache. It passed with
+  `--experimental.fsModuleCache=false`, and with any config change (a new
+  key). The same goes stale when an imported file's types change and the
+  importing file doesn't. Workaround here: `experimental: { fsModuleCache:
+false }` in `vitest.config.ts`. Fix in typesugar: unplugin-typesugar's
+  Vite plugin can register a cache-key generator under Vitest
+  (`configureVitest` → `defineCacheKeyGenerator`) that returns `false` for
+  the files it transforms, keeping them out of the cache; not done.

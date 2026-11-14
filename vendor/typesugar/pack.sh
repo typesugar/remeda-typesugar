@@ -55,6 +55,14 @@ done
   (cd "$OUT" && shasum -a 256 *.tgz | sed 's/^/  /')
 } > "$OUT/COMMIT"
 
+# The typesugar checkout's origin URL can carry a token: never leave one in
+# a file that gets committed, even if the sed above misses a URL shape.
+if grep -Eq '://[^/[:space:]]*@' "$OUT/COMMIT"; then
+  rm -f "$OUT/COMMIT"
+  echo "error: the remote URL still carries credentials; COMMIT not written" >&2
+  exit 1
+fi
+
 # Point the case-study package's dependencies and overrides at the new names.
 sed -E -i.bak "s#(vendor/typesugar/[a-z-]+-[0-9]+\.[0-9]+\.[0-9]+[^-/\"]*)(-[0-9a-f]{8})?\.tgz#\1-$SHORT.tgz#g" \
   "$ROOT/case-study/package.json"

@@ -31,6 +31,12 @@ export default defineConfig({
     tsconfigPaths(),
   ],
   test: {
+    // typesugar (case study, finding F12): Vitest 5 caches transformed
+    // modules on disk by file content and config, but typesugar's output for
+    // a file also depends on the types of the files it imports and on the
+    // typesugar version, so a cached expansion goes stale. Off until
+    // unplugin-typesugar keeps its files out of that cache.
+    experimental: { fsModuleCache: false },
     coverage: {
       include: ["src/**"],
       exclude: [

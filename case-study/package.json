@@ -4,26 +4,26 @@
   "description": "typesugar dependencies for the remeda case study (see CASE-STUDY.md). Installed on its own with `npm install --prefix case-study` so the repo root lockfile is unchanged.",
   "private": true,
   "dependencies": {
-    "@typesugar/fusion": "file:../vendor/typesugar/typesugar-fusion-0.1.1-8e43be90.tgz",
+    "@typesugar/fusion": "file:../vendor/typesugar/typesugar-fusion-0.1.1-d5277209.tgz",
     "typescript": "6.0.3",
-    "typesugar": "file:../vendor/typesugar/typesugar-0.1.1-8e43be90.tgz",
-    "unplugin-typesugar": "file:../vendor/typesugar/unplugin-typesugar-0.1.1-8e43be90.tgz"
+    "typesugar": "file:../vendor/typesugar/typesugar-0.1.1-d5277209.tgz",
+    "unplugin-typesugar": "file:../vendor/typesugar/unplugin-typesugar-0.1.1-d5277209.tgz"
   },
   "overrides": {
-    "@typesugar/contracts": "file:../vendor/typesugar/typesugar-contracts-0.1.1-8e43be90.tgz",
-    "@typesugar/core": "file:../vendor/typesugar/typesugar-core-0.1.1-8e43be90.tgz",
-    "@typesugar/derive": "file:../vendor/typesugar/typesugar-derive-0.1.1-8e43be90.tgz",
-    "@typesugar/fp": "file:../vendor/typesugar/typesugar-fp-0.1.1-8e43be90.tgz",
-    "@typesugar/fusion": "file:../vendor/typesugar/typesugar-fusion-0.1.1-8e43be90.tgz",
-    "@typesugar/lsp-common": "file:../vendor/typesugar/typesugar-lsp-common-0.1.1-8e43be90.tgz",
-    "@typesugar/macros": "file:../vendor/typesugar/typesugar-macros-0.1.1-8e43be90.tgz",
-    "@typesugar/reflect": "file:../vendor/typesugar/typesugar-reflect-0.1.1-8e43be90.tgz",
-    "@typesugar/std": "file:../vendor/typesugar/typesugar-std-0.1.1-8e43be90.tgz",
-    "@typesugar/transformer": "file:../vendor/typesugar/typesugar-transformer-0.1.1-8e43be90.tgz",
-    "@typesugar/transformer-core": "file:../vendor/typesugar/typesugar-transformer-core-0.1.1-8e43be90.tgz",
-    "@typesugar/type-system": "file:../vendor/typesugar/typesugar-type-system-0.1.1-8e43be90.tgz",
-    "@typesugar/typeclass": "file:../vendor/typesugar/typesugar-typeclass-0.1.1-8e43be90.tgz",
-    "typesugar": "file:../vendor/typesugar/typesugar-0.1.1-8e43be90.tgz",
-    "unplugin-typesugar": "file:../vendor/typesugar/unplugin-typesugar-0.1.1-8e43be90.tgz"
+    "@typesugar/contracts": "file:../vendor/typesugar/typesugar-contracts-0.1.1-d5277209.tgz",
+    "@typesugar/core": "file:../vendor/typesugar/typesugar-core-0.1.1-d5277209.tgz",
+    "@typesugar/derive": "file:../vendor/typesugar/typesugar-derive-0.1.1-d5277209.tgz",
+    "@typesugar/fp": "file:../vendor/typesugar/typesugar-fp-0.1.1-d5277209.tgz",
+    "@typesugar/fusion": "file:../vendor/typesugar/typesugar-fusion-0.1.1-d5277209.tgz",
+    "@typesugar/lsp-common": "file:../vendor/typesugar/typesugar-lsp-common-0.1.1-d5277209.tgz",
+    "@typesugar/macros": "file:../vendor/typesugar/typesugar-macros-0.1.1-d5277209.tgz",
+    "@typesugar/reflect": "file:../vendor/typesugar/typesugar-reflect-0.1.1-d5277209.tgz",
+    "@typesugar/std": "file:../vendor/typesugar/typesugar-std-0.1.1-d5277209.tgz",
+    "@typesugar/transformer": "file:../vendor/typesugar/typesugar-transformer-0.1.1-d5277209.tgz",
+    "@typesugar/transformer-core": "file:../vendor/typesugar/typesugar-transformer-core-0.1.1-d5277209.tgz",
+    "@typesugar/type-system": "file:../vendor/typesugar/typesugar-type-system-0.1.1-d5277209.tgz",
+    "@typesugar/typeclass": "file:../vendor/typesugar/typesugar-typeclass-0.1.1-d5277209.tgz",
+    "typesugar": "file:../vendor/typesugar/typesugar-0.1.1-d5277209.tgz",
+    "unplugin-typesugar": "file:../vendor/typesugar/unplugin-typesugar-0.1.1-d5277209.tgz"
   }
 }
