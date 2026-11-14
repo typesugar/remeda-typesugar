@@ -1,0 +1,5 @@
+{
+  // Type-check only the syntax demo (typesugar check / tsc).
+  "extends": "./tsconfig.json",
+  "include": ["syntax-*.ts"]
+}
